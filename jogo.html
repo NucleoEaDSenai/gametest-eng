@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Word Search</title>
+
+  <style>
+    :root {
+      --baseW: 1155px;
+      --baseH: 650px;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: url("img/bg.png") no-repeat center center fixed;
+      background-size: cover;
+      font-family: "Segoe UI", Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #stage {
+      position: absolute;
+      width: var(--baseW);
+      height: var(--baseH);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      transform-origin: center center;
+      will-change: transform;
+    }
+
+    .glass,
+    .glass-strong {
+      background: rgba(255,255,255,0.55);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      border-radius: 12px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    header {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    #topbar {
+      display: inline-flex;
+      align-items: center;
+      gap: 15px;
+      padding: 8px 12px;
+      margin: 0 0 0 100px;
+    }
+
+    #timer {
+      font-size: 21px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    #newGame,
+    #btnRestart {
+      padding: 6px 14px;
+      font-size: 19px;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.05s;
+    }
+
+    #newGame {
+      background: #2196f3;
+    }
+
+    #newGame:hover {
+      background: #1976d2;
+    }
+
+    #btnRestart {
+      background: #008542;
+      margin-left: 10px;
+    }
+
+    #btnRestart:hover {
+      background: #006b34;
+    }
+
+    #newGame:active,
+    #btnRestart:active {
+      transform: translateY(1px);
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-right: 8px;
+      padding: 10px 14px;
+    }
+
+    #words {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    #words li {
+      margin: 2px 0;
+      font-weight: bold;
+      color: #333;
+      font-size: 22px;
+    }
+
+    #words li.found {
+      text-decoration: line-through;
+      color: #008542;
+    }
+
+    #progress {
+      margin-top: 8px;
+      font-size: 19px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    #progressBar {
+      width: 100%;
+      height: 12px;
+      background: #000;
+      border-radius: 6px;
+      margin-top: 3px;
+      overflow: hidden;
+    }
+
+    #progressFill {
+      height: 100%;
+      width: 0%;
+      background: #008542;
+      transition: width 0.3s;
+    }
+
+    #board {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+    }
+
+    table {
+      border-collapse: collapse;
+      user-select: none;
+    }
+
+    td {
+      width: 32px;
+      height: 32px;
+      text-align: center;
+      vertical-align: middle;
+      border: 1px solid #ccc;
+      font-weight: bold;
+      font-size: 23px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    td.selected {
+      background: #fdc82f;
+    }
+
+    td.found {
+      background: #00b2a9;
+      color: #fff;
+    }
+
+    #victory {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      display: none;
+      max-width: min(480px, 90%);
+      text-align: center;
+      padding: 12px 18px;
+      font-size: 19px;
+      font-weight: bold;
+      color: #008542;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="stage">
+  <div id="container">
+
+    <header>
+      <div id="topbar" class="glass">
+        <div id="timer">⏱ Time: 0m 0s</div>
+        <button id="newGame">🔄 New Game</button>
+      </div>
+    </header>
+
+    <main>
+
+      <div id="sidebar" class="glass">
+        <ul id="words"></ul>
+
+        <div id="progress"></div>
+
+        <div id="progressBar">
+          <div id="progressFill"></div>
+        </div>
+      </div>
+
+      <div id="board" class="glass-strong">
+
+        <table id="grid"></table>
+
+        <div id="victory" class="glass" role="dialog" aria-live="polite">
+          Congratulations! <br>
+          You found all the words!<br><br>
+
+          <button id="btnRestart" aria-label="Play again">
+            Play Again
+          </button>
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+</div>
+
+<script>
+
+const words = [
+  "TONINHA",
+  "SUPPLIES",
+  "RECYCLING",
+  "IMPACT",
+  "MITIGATE",
+  "MONITOR",
+  "REHABILITATE",
+  "ACTIVATION",
+  "COMMUNICATION",
+  "WASTE",
+  "LICENSE",
+  "GREENLINE"
+];
+
+const size = 15;
+const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+const selectionDirections = [
+  [0,1],
+  [1,0],
+  [1,1]
+];
+
+const hvDirections = [
+  [0,1],
+  [1,0]
+];
+
+let grid;
+let table;
+let wordList;
+let progress;
+let victory;
+let timerEl;
+let progressFill;
+
+let selecting = false;
+let start = null;
+let end = null;
+let currentLine = [];
+
+let foundWords = 0;
+let time = 0;
+let interval = null;
+
+function randomLetter() {
+  return letters[Math.floor(Math.random() * letters.length)];
+}
+
+function fillEmptySpaces() {
+
+  for (let i = 0; i < size; i++) {
+
+    for (let j = 0; j < size; j++) {
+
+      if (grid[i][j] === "") {
+        grid[i][j] = randomLetter();
+      }
+
+    }
+
+  }
+
+}
+
+function placeWordWithDirection(word, dir) {
+
+  let attempts = 0;
+
+  while (attempts < 300) {
+
+    const row = Math.floor(Math.random() * size);
+    const col = Math.floor(Math.random() * size);
+
+    let r = row;
+    let c = col;
+    let canPlace = true;
+
+    for (let i = 0; i < word.length; i++) {
+
+      if (
+        r < 0 ||
+        r >= size ||
+        c < 0 ||
+        c >= size ||
+        (grid[r][c] !== "" && grid[r][c] !== word[i])
+      ) {
+        canPlace = false;
+        break;
+      }
+
+      r += dir[0];
+      c += dir[1];
+    }
+
+    if (canPlace) {
+
+      r = row;
+      c = col;
+
+      for (let i = 0; i < word.length; i++) {
+
+        grid[r][c] = word[i];
+
+        r += dir[0];
+        c += dir[1];
+      }
+
+      return true;
+    }
+
+    attempts++;
+  }
+
+  return false;
+}
+
+function placeWordHV(word) {
+
+  let placed = false;
+
+  while (!placed) {
+
+    const dir = hvDirections[
+      Math.floor(Math.random() * hvDirections.length)
+    ];
+
+    const row = Math.floor(Math.random() * size);
+    const col = Math.floor(Math.random() * size);
+
+    let r = row;
+    let c = col;
+    let canPlace = true;
+
+    for (let i = 0; i < word.length; i++) {
+
+      if (
+        r < 0 ||
+        r >= size ||
+        c < 0 ||
+        c >= size ||
+        (grid[r][c] !== "" && grid[r][c] !== word[i])
+      ) {
+        canPlace = false;
+        break;
+      }
+
+      r += dir[0];
+      c += dir[1];
+    }
+
+    if (canPlace) {
+
+      r = row;
+      c = col;
+
+      for (let i = 0; i < word.length; i++) {
+
+        grid[r][c] = word[i];
+
+        r += dir[0];
+        c += dir[1];
+      }
+
+      placed = true;
+    }
+
+  }
+
+}
+
+function twoDistinctIndexes(n) {
+
+  const a = Math.floor(Math.random() * n);
+
+  let b = Math.floor(Math.random() * n);
+
+  while (b === a) {
+    b = Math.floor(Math.random() * n);
+  }
+
+  return [a, b];
+}
+
+function prepareGridWithTwoDiagonals() {
+
+  for (let reset = 0; reset < 80; reset++) {
+
+    grid = Array.from(
+      { length: size },
+      () => Array(size).fill("")
+    );
+
+    const [i1, i2] = twoDistinctIndexes(words.length);
+
+    const ok1 = placeWordWithDirection(words[i1], [1,1]);
+    const ok2 = placeWordWithDirection(words[i2], [1,1]);
+
+    if (ok1 && ok2) {
+
+      for (let i = 0; i < words.length; i++) {
+
+        if (i === i1 || i === i2) continue;
+
+        placeWordHV(words[i]);
+      }
+
+      return true;
+    }
+
+  }
+
+  grid = Array.from(
+    { length: size },
+    () => Array(size).fill("")
+  );
+
+  const [i1, i2] = twoDistinctIndexes(words.length);
+
+  placeWordWithDirection(words[i1], [1,1]);
+
+  placeWordHV(words[i2]);
+
+  for (let i = 0; i < words.length; i++) {
+
+    if (i === i1 || i === i2) continue;
+
+    placeWordHV(words[i]);
+  }
+
+  return false;
+}
+
+function initializeGame() {
+
+  prepareGridWithTwoDiagonals();
+
+  fillEmptySpaces();
+
+  table.innerHTML = "";
+
+  grid.forEach((row, i) => {
+
+    const tr = document.createElement("tr");
+
+    row.forEach((letter, j) => {
+
+      const td = document.createElement("td");
+
+      td.textContent = letter;
+
+      td.dataset.row = i;
+      td.dataset.col = j;
+
+      tr.appendChild(td);
+
+    });
+
+    table.appendChild(tr);
+
+  });
+
+  wordList.innerHTML = "";
+
+  words.forEach(word => {
+
+    const li = document.createElement("li");
+
+    li.textContent = word;
+
+    wordList.appendChild(li);
+
+  });
+
+  foundWords = 0;
+
+  progress.textContent =
+    `0 / ${words.length} words found`;
+
+  progressFill.style.width = "0%";
+
+  victory.style.display = "none";
+
+  time = 0;
+
+  timerEl.textContent = "⏱ Time: 0m 0s";
+
+  if (interval) clearInterval(interval);
+
+  interval = setInterval(() => {
+
+    time++;
+
+    const min = Math.floor(time / 60);
+    const sec = time % 60;
+
+    timerEl.textContent =
+      `⏱ Time: ${min}m ${sec}s`;
+
+  }, 1000);
+
+}
+
+function highlightLine(start, end) {
+
+  currentLine.forEach(td => td.classList.remove("selected"));
+
+  currentLine = [];
+
+  if (!start || !end) return;
+
+  const r1 = +start.dataset.row;
+  const c1 = +start.dataset.col;
+
+  const r2 = +end.dataset.row;
+  const c2 = +end.dataset.col;
+
+  let dr = r2 - r1;
+  let dc = c2 - c1;
+
+  let steps = Math.max(
+    Math.abs(dr),
+    Math.abs(dc)
+  );
+
+  let stepR = dr === 0 ? 0 : dr / Math.abs(dr);
+
+  let stepC = dc === 0 ? 0 : dc / Math.abs(dc);
+
+  if (!(
+    (stepR === 0 && stepC === 1) ||
+    (stepR === 1 && stepC === 0) ||
+    (stepR === 1 && stepC === 1)
+  )) return;
+
+  let r = r1;
+  let c = c1;
+
+  for (let i = 0; i <= steps; i++) {
+
+    const td = document.querySelector(
+      `td[data-row='${r}'][data-col='${c}']`
+    );
+
+    if (td) currentLine.push(td);
+
+    r += stepR;
+    c += stepC;
+  }
+
+  currentLine.forEach(td =>
+    td.classList.add("selected")
+  );
+}
+
+function validateSelection() {
+
+  if (currentLine.length < 2) return;
+
+  const selectedWord =
+    currentLine.map(td => td.textContent).join("");
+
+  const reverseSelectedWord =
+    currentLine.map(td => td.textContent).reverse().join("");
+
+  let target = null;
+
+  words.forEach(word => {
+
+    if (
+      word === selectedWord ||
+      word === reverseSelectedWord
+    ) {
+      target = word;
+    }
+
+  });
+
+  if (
+    target &&
+    currentLine.length === target.length
+  ) {
+
+    currentLine.forEach(td => {
+
+      td.classList.remove("selected");
+      td.classList.add("found");
+
+    });
+
+    Array.from(wordList.children).forEach(li => {
+
+      if (
+        li.textContent === target &&
+        !li.classList.contains("found")
+      ) {
+
+        li.classList.add("found");
+
+        foundWords++;
+
+        progress.textContent =
+          `${foundWords} / ${words.length} words found`;
+
+        progressFill.style.width =
+          `${(foundWords / words.length) * 100}%`;
+
+        if (foundWords === words.length) {
+
+          victory.style.display = "block";
+
+          const btn =
+            document.getElementById("btnRestart");
+
+          if (btn) btn.focus();
+
+          clearInterval(interval);
+        }
+
+      }
+
+    });
+
+  } else {
+
+    currentLine.forEach(td =>
+      td.classList.remove("selected")
+    );
+
+  }
+
+  currentLine = [];
+}
+
+function activateEvents() {
+
+  table.addEventListener("mousedown", e => {
+
+    if (e.target.tagName === "TD") {
+
+      selecting = true;
+
+      start = e.target;
+
+      end = null;
+    }
+
+  });
+
+  table.addEventListener("mouseover", e => {
+
+    if (
+      selecting &&
+      e.target.tagName === "TD"
+    ) {
+
+      end = e.target;
+
+      highlightLine(start, end);
+    }
+
+  });
+
+  window.addEventListener("mouseup", () => {
+
+    if (selecting) {
+
+      validateSelection();
+
+      selecting = false;
+
+      start = null;
+      end = null;
+    }
+
+  });
+
+  table.addEventListener("touchstart", e => {
+
+    const td = document.elementFromPoint(
+      e.touches[0].clientX,
+      e.touches[0].clientY
+    );
+
+    if (td && td.tagName === "TD") {
+
+      selecting = true;
+
+      start = td;
+
+      end = null;
+    }
+
+  });
+
+  table.addEventListener("touchmove", e => {
+
+    const td = document.elementFromPoint(
+      e.touches[0].clientX,
+      e.touches[0].clientY
+    );
+
+    if (
+      selecting &&
+      td &&
+      td.tagName === "TD"
+    ) {
+
+      end = td;
+
+      highlightLine(start, end);
+    }
+
+  });
+
+  table.addEventListener("touchend", () => {
+
+    if (selecting) {
+
+      validateSelection();
+
+      selecting = false;
+
+      start = null;
+      end = null;
+    }
+
+  });
+
+}
+
+function applyScale() {
+
+  const baseW = 1155;
+  const baseH = 650;
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  const scale = Math.min(
+    vw / baseW,
+    vh / baseH,
+    1
+  );
+
+  document.getElementById("stage").style.transform =
+    `translate(-50%, -50%) scale(${scale})`;
+
+}
+
+table = document.getElementById("grid");
+
+wordList = document.getElementById("words");
+
+progress = document.getElementById("progress");
+
+victory = document.getElementById("victory");
+
+timerEl = document.getElementById("timer");
+
+progressFill = document.getElementById("progressFill");
+
+initializeGame();
+
+activateEvents();
+
+document.getElementById("newGame")
+.addEventListener("click", () => {
+
+  initializeGame();
+
+  applyScale();
+
+});
+
+document.getElementById("btnRestart")
+.addEventListener("click", () => {
+
+  initializeGame();
+
+  applyScale();
+
+});
+
+window.addEventListener("load", applyScale);
+
+window.addEventListener("resize", applyScale);
+
+window.addEventListener("orientationchange", applyScale);
+
+</script>
+
+</body>
+</html>
